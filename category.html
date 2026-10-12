@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Cardápio</title>
+  <link rel="stylesheet" href="style.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+</head>
+<body>
+
+<div class="particles" id="particles"></div>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-inner">
+    <div class="logo" id="siteLogoWrap">
+      <span class="logo-icon" id="logoEmoji">🍔</span>
+      <div class="logo-text">
+        <span class="logo-main" id="headerName">GAMAA</span>
+        <span class="logo-sub"  id="headerSub">BURGUER</span>
+      </div>
+    </div>
+    <nav class="nav-links">
+      <a href="index.html"><i class="fa fa-home"></i> Início</a>
+    </nav>
+  </div>
+</header>
+
+<!-- PAGE HEADER -->
+<div class="page-header" id="pageHeader">
+  <div class="cat-hero-photo" id="catHeroPhoto"></div>
+  <a href="index.html" class="back-btn"><i class="fa fa-arrow-left"></i> Voltar ao cardápio</a>
+  <h1 id="catTitle">—</h1>
+  <p id="catDesc">—</p>
+</div>
+
+<!-- CATEGORY PILL TABS (SMARTPHONE FRIENDLY) -->
+<div class="cat-pill-nav-container">
+  <div class="cat-pill-nav" id="catPillNav"></div>
+</div>
+
+<!-- ITEMS -->
+<section class="items-section">
+  <div class="items-grid" id="itemsGrid"></div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <span class="logo-icon" id="footerEmoji">🍔</span>
+      <span class="footer-name" id="footerName">GAMAA BURGUER</span>
+    </div>
+    <div class="footer-social" id="footerSocial"></div>
+    <p class="footer-copy" id="footerText">© 2026 Gamaa Burguer</p>
+    <a href="admin.html" class="footer-admin-link" aria-label="Acesso Administrativo" title="Painel Admin"><i class="fa fa-lock"></i></a>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="app.js"></script>
+<script>
+const cfg  = getSiteConfig();
+const cats = getCategoryConfig();
+applyTheme(cfg);
+
+/* ── Header / footer ── */
+document.getElementById('headerName').textContent = cfg.siteName;
+document.getElementById('headerSub').textContent  = cfg.siteSub;
+const fEmoji = document.getElementById('footerEmoji');
+if (cfg.logoEmoji) {
+  fEmoji.textContent = cfg.logoEmoji;
+  fEmoji.style.display = '';
+} else {
+  fEmoji.textContent = '';
+  fEmoji.style.display = 'none';
+}
+document.getElementById('footerName').textContent  = `${cfg.siteName} ${cfg.siteSub}`.trim().toUpperCase();
+document.getElementById('footerText').textContent  = cfg.footerText;
+
+const emojiEl = document.getElementById('logoEmoji');
+if (cfg.logoImage) {
+  const wrap = document.getElementById('siteLogoWrap');
+  const img = document.createElement('img');
+  img.src = cfg.logoImage; img.className = 'logo-img'; img.alt = 'Logo';
+  wrap.insertBefore(img, emojiEl); emojiEl.style.display = 'none';
+} else {
+  if (cfg.logoEmoji) {
+    emojiEl.textContent = cfg.logoEmoji;
+    emojiEl.style.display = '';
+  } else {
+    emojiEl.textContent = '';
+    emojiEl.style.display = 'none';
+  }
+}
+
+const footerSocial = document.getElementById('footerSocial');
+if (cfg.instagram) footerSocial.innerHTML += `<a href="${cfg.instagram}" target="_blank"><i class="fab fa-instagram"></i></a>`;
+if (cfg.whatsapp) {
+  const wa = cfg.whatsapp.replace(/\D/g,'');
+  footerSocial.innerHTML += `<a href="https://wa.me/${wa}" target="_blank"><i class="fab fa-whatsapp"></i></a>`;
+}
+
+/* ── Category info ── */
+const params = new URLSearchParams(location.search);
+const slug   = params.get('cat') || getCatOrder()[0] || 'hamburgueres';
+const cat    = cats[slug] || { label: slug, icon: '', description: '', photo: '' };
+
+document.title = `${cfg.siteName} – ${cat.label}`;
+
+// Hero photo
+if (cat.photo) {
+  document.getElementById('catHeroPhoto').style.backgroundImage = `url('${cat.photo}')`;
+}
+
+const titleIcon = cat.icon ? `${cat.icon} ` : '';
+document.getElementById('catTitle').innerHTML = `${titleIcon}<span>${cat.label.toUpperCase()}</span>`;
+document.getElementById('catDesc').textContent = cat.description;
+
+/* ── Render Category Pills (Super fast smartphone navigation) ── */
+const pillNav = document.getElementById('catPillNav');
+if (pillNav) {
+  pillNav.innerHTML = '';
+  getCatOrder().forEach(cSlug => {
+    const cItem = cats[cSlug];
+    if (!cItem) return;
+    const a = document.createElement('a');
+    a.href = `category.html?cat=${cSlug}`;
+    a.className = `cat-pill-btn ${cSlug === slug ? 'active' : ''}`;
+    const pillIcon = cItem.icon ? `<span class="pill-icon">${cItem.icon}</span> ` : '';
+    a.innerHTML = `${pillIcon}<span class="pill-label">${cItem.label}</span>`;
+    pillNav.appendChild(a);
+  });
+  // Auto-scroll pill nav to active category on mobile
+  setTimeout(() => {
+    const activePill = pillNav.querySelector('.cat-pill-btn.active');
+    if (activePill) {
+      activePill.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }, 100);
+}
+
+/* ── Render items ── */
+function renderItems() {
+  window.cardImages = {};
+  const items = getCategoryItems(slug);
+  const grid  = document.getElementById('itemsGrid');
+  grid.innerHTML = '';
+
+  if (items.length === 0) {
+    grid.innerHTML = `
+      <div class="empty-state" style="grid-column:1/-1">
+        <i class="fa fa-utensils"></i>
+        <h3>Nenhum item disponível</h3>
+        <p>Esta categoria ainda não possui itens. O administrador pode adicioná-los.</p>
+      </div>`;
+    return;
+  }
+
+  const cleanWa = (cfg.whatsapp || '').replace(/\D/g, '');
+
+  items.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'item-card';
+
+    /* ── Image section — supports multiple images ── */
+    const imgs = (Array.isArray(item.images) && item.images.length) ? item.images : (item.imageUrl ? [item.imageUrl] : []);
+    let imageHTML = '';
+    if (imgs.length > 0) {
+      window.cardImages[item.id] = { imgs, idx: 0 };
+      if (imgs.length === 1) {
+        imageHTML = `
+          <div class="item-image-wrap" style="position:relative">
+            <img src="${imgs[0]}" alt="${item.name}" loading="lazy"/>
+          </div>`;
+      } else {
+        imageHTML = `
+          <div class="item-image-wrap item-slider-wrap" id="slider_${item.id}">
+            <img src="${imgs[0]}" id="img_${item.id}" alt="${item.name}" loading="lazy"/>
+            <span class="img-count-badge" id="badge_${item.id}"><i class="fa fa-images"></i> 1/${imgs.length}</span>
+            <button type="button" class="slider-btn prev" onclick="changeCardSlide('${item.id}', -1, event)" aria-label="Imagem anterior"><i class="fa fa-chevron-left"></i></button>
+            <button type="button" class="slider-btn next" onclick="changeCardSlide('${item.id}', 1, event)" aria-label="Próxima imagem"><i class="fa fa-chevron-right"></i></button>
+            <div class="slider-dots" id="dots_${item.id}">
+              ${imgs.map((_, i) => `<span class="s-dot ${i === 0 ? 'active' : ''}" onclick="goToCardSlide('${item.id}', ${i}, event)"></span>`).join('')}
+            </div>
+          </div>`;
+      }
+    }
+
+    /* ── Video section ── */
+    let videoHTML = '';
+    if (item.videoDbId) {
+      // async load from IndexedDB — rendered after append
+      videoHTML = `<div class="item-video-wrap" id="vidwrap_${item.id}"><div class="no-media" style="position:absolute;inset:0"><i class="fa fa-spinner fa-spin"></i></div></div>`;
+    } else {
+      const embed = getEmbedUrl(item.videoUrl);
+      if (embed) {
+        if (embed.includes('youtube') || embed.includes('vimeo')) {
+          videoHTML = `
+            <div class="item-video-wrap">
+              <iframe src="${embed}" frameborder="0" allowfullscreen
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture">
+              </iframe>
+            </div>`;
+        } else {
+          videoHTML = `
+            <div class="item-video-wrap">
+              <video src="${embed}" controls muted loop playsinline></video>
+            </div>`;
+        }
+      }
+    }
+
+    /* ── Placeholder (neither image nor video) ── */
+    if (!imageHTML && !videoHTML) {
+      imageHTML = `
+        <div class="item-image-wrap" style="padding-top:46%">
+          <div class="no-media" style="position:absolute;inset:0">
+            <i class="fa fa-image"></i>
+            <span>Sem imagem</span>
+          </div>
+        </div>`;
+    }
+
+    /* ── Tags ── */
+    const tagsHTML = (item.tags || []).map(t => `<span class="item-tag">${t}</span>`).join('');
+
+    /* ── WhatsApp Order Button (mobile friendly) ── */
+    let orderBtnHTML = '';
+    if (cleanWa) {
+      const waMsg = encodeURIComponent(`Olá! Gostaria de pedir: *${item.name}* (${formatPrice(item.price)})`);
+      orderBtnHTML = `
+        <a href="https://wa.me/${cleanWa}?text=${waMsg}" target="_blank" class="btn-item-order" title="Pedir pelo WhatsApp">
+          <i class="fab fa-whatsapp"></i> Pedir
+        </a>`;
+    }
+
+    card.innerHTML = `
+      ${imageHTML}
+      ${videoHTML}
+      <div class="item-info">
+        <div class="item-info-top">
+          <h3>${item.name}</h3>
+          ${item.price ? `<div class="item-price">${formatPrice(item.price)}</div>` : ''}
+        </div>
+        <p class="item-desc">${item.description || ''}</p>
+        <div class="item-info-bottom">
+          <div class="item-tags">${tagsHTML}</div>
+          ${orderBtnHTML}
+        </div>
+      </div>`;
+
+    grid.appendChild(card);
+
+    // Async load MP4 from IndexedDB if needed
+    if (item.videoDbId) {
+      resolveVideoSrc(item).then(src => {
+        const w = document.getElementById('vidwrap_' + item.id);
+        if (w && src) w.innerHTML = `<video src="${src}" controls muted loop playsinline></video>`;
+      });
+    }
+  });
+}
+
+function changeCardSlide(id, dir, e) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+  const data = window.cardImages && window.cardImages[id];
+  if (!data || !data.imgs.length) return;
+  const newIdx = (data.idx + dir + data.imgs.length) % data.imgs.length;
+  goToCardSlide(id, newIdx, e);
+}
+
+function goToCardSlide(id, idx, e) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+  const data = window.cardImages && window.cardImages[id];
+  if (!data || !data.imgs[idx]) return;
+  data.idx = idx;
+  const imgEl = document.getElementById('img_' + id);
+  if (imgEl) imgEl.src = data.imgs[idx];
+  const badge = document.getElementById('badge_' + id);
+  if (badge) badge.innerHTML = `<i class="fa fa-images"></i> ${idx + 1}/${data.imgs.length}`;
+  const dotsWrap = document.getElementById('dots_' + id);
+  if (dotsWrap) {
+    const dots = dotsWrap.querySelectorAll('.s-dot');
+    dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+  }
+}
+
+renderItems();
+
+/* ── Particles ── */
+const pc = document.getElementById('particles');
+for (let i = 0; i < 14; i++) {
+  const p = document.createElement('div');
+  p.className = 'particle';
+  p.style.left              = Math.random() * 100 + 'vw';
+  p.style.animationDelay    = Math.random() * 8 + 's';
+  p.style.animationDuration = (6 + Math.random() * 6) + 's';
+  p.style.width = p.style.height = (3 + Math.random() * 7) + 'px';
+  pc.appendChild(p);
+}
+</script>
+</body>
+</html>
